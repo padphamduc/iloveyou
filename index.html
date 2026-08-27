@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Phạm Anh Đức</title>
+    <meta name="description" content="Trang kỷ niệm tình yêu 3D nghệ thuật tương tác với Three.js và WebGL">
+    
+    <!-- Anti-Cache & No-Cookie / No-Storage Headers for GitHub Pages -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate, max-age=0">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    
+    <!-- Google Fonts with 100% Vietnamese Diacritics Support -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&family=Montserrat:wght@400;500;600;700;800&family=Dancing+Script:wght@600;700&family=Outfit:wght@400;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Always Fetch Fresh CSS with Cache-Busting Version -->
+    <link rel="stylesheet" href="style.css?v=2.6.0">
+
+    <!-- Core Three.js & Postprocessing CDN Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+
+    <!-- GSAP for Smooth Animation Timeline -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+</head>
+<body>
+    <!-- Fullscreen Three.js WebGL Canvas -->
+    <canvas id="webgl-canvas"></canvas>
+
+    <!-- Supernova Flash Transition Layer -->
+    <div id="flash-overlay"></div>
+
+    <!-- Audio Player & Floating Toggle -->
+    <audio id="bg-music" src="assets/music.mp3" loop preload="auto"></audio>
+    <button class="floating-btn" id="audio-toggle" title="Bật/Tắt Âm Thanh" aria-label="Audio Toggle">
+        <span>🔊</span>
+    </button>
+
+    <!-- Floating 'Mở QR Tình Yêu' Button -->
+    <button class="qr-toggle-btn" id="qr-toggle-btn" title="Mở QR Tình Yêu" aria-label="Mở QR Tình Yêu">
+        <span>📱 Mở QR Tình Yêu</span>
+    </button>
+
+    <!-- Heart QR Modal using Exact Image with Center VIP Photo -->
+    <div id="qr-modal" class="qr-modal-overlay">
+        <div class="qr-heart-image-card">
+            <button class="qr-close-btn" id="qr-close-btn" aria-label="Đóng QR">✕</button>
+            
+            <!-- Exact Heart QR Image (100% Scannable on all devices) -->
+            <div class="qr-heart-img-wrapper">
+                <img src="img/heart_qr.png" alt="Heart QR Code" class="qr-heart-main-img" onerror="this.src='heart_qr.png'">
+            </div>
+        </div>
+    </div>
+
+    <!-- Anti-Cache, Cookie Purger & Background Sync Service Worker Setup -->
+    <script>
+        (function() {
+            try {
+                // 1. Dọn dẹp Session Storage & Local Storage các phiên cũ
+                sessionStorage.clear();
+                
+                // 2. Xóa toàn bộ Cookie cũ trên trình duyệt
+                document.cookie.split(";").forEach(function(c) {
+                    document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+                });
+
+                // 3. Đăng ký Service Worker sw.js hỗ trợ Background Sync
+                if ('serviceWorker' in navigator) {
+                    navigator.serviceWorker.register('sw.js').catch(function() {});
+                }
+            } catch(e) {}
+        })();
+    </script>
+
+    <!-- Universal Standalone Engine Script with Cache-Busting Version -->
+    <script src="app.js?v=2.7.0"></script>
+</body>
+</html>
