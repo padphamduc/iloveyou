@@ -50,27 +50,28 @@ body.red-world {
     touch-action: none;
 }
 
-/* Center Heart Circular Pink Photo (Clean Pink Border, 3D Synced) */
+/* Center Heart Circular Photo (Clean, Frameless, 3D Tracked) */
 #center-heart-photo {
     position: fixed;
     top: 0;
     left: 0;
     z-index: 10;
     pointer-events: none;
-    display: flex;
+    display: none;
     align-items: center;
     justify-content: center;
-    width: 108px;
-    height: 108px;
+    width: 140px;
+    height: 140px;
     border-radius: 50%;
     overflow: hidden;
-    border: 3.5px solid #ff2a6d;
-    box-shadow: 0 0 22px #ff164d, 0 0 40px rgba(255, 42, 109, 0.7);
-    background: #110005;
+    border: none;
+    box-shadow: none;
+    background: transparent;
     opacity: 0;
     will-change: transform, opacity;
     transform-style: preserve-3d;
     transform-origin: center center;
+    transition: opacity 0.8s ease-out;
 }
 
 #center-heart-photo img {

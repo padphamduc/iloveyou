@@ -300,69 +300,63 @@
         };
     }
 
-    // Load and build clean circular photo with glowing pink border (Khung tròn màu hồng)
     function createCircularPinkPhotoTexture(onReady) {
-        const img = new Image();
+        const canvas = document.createElement('canvas');
+        canvas.width = 512;
+        canvas.height = 512;
+        const ctx = canvas.getContext('2d');
 
-        const renderCanvas = (image) => {
-            const size = 512;
-            const canvas = document.createElement('canvas');
-            canvas.width = size;
-            canvas.height = size;
-            const ctx = canvas.getContext('2d');
-            const cx = size / 2;
-            const cy = size / 2;
-            const radius = size * 0.44;
+        const tex = new THREE.CanvasTexture(canvas);
+        if (THREE.sRGBEncoding) tex.encoding = THREE.sRGBEncoding;
 
-            // 1. Circular Masked Photo
+        const drawImg = (image) => {
+            if (!image || !image.width) return;
+            ctx.clearRect(0, 0, 512, 512);
+
+            // Cut clean circular avatar without any black box or borders
             ctx.save();
             ctx.beginPath();
-            ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+            ctx.arc(256, 256, 250, 0, Math.PI * 2);
+            ctx.closePath();
             ctx.clip();
+
+            // Tăng cường độ sáng, tương phản và độ tươi cho ảnh sáng rõ, sắc nét
+            ctx.filter = 'brightness(1.22) contrast(1.10) saturate(1.10)';
 
             const minDim = Math.min(image.width, image.height);
             const sx = (image.width - minDim) / 2;
             const sy = (image.height - minDim) / 2;
-            ctx.drawImage(image, sx, sy, minDim, minDim, cx - radius, cy - radius, radius * 2, radius * 2);
+            ctx.drawImage(image, sx, sy, minDim, minDim, 0, 0, 512, 512);
             ctx.restore();
 
-            // 2. Pure Glowing Pink Circular Border (Khung tròn màu hồng tỏa sáng)
-            ctx.save();
-            ctx.shadowColor = '#ff0055';
-            ctx.shadowBlur = 24;
-            ctx.lineWidth = 14;
-            ctx.strokeStyle = '#ff2a6d';
-            ctx.beginPath();
-            ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-            ctx.stroke();
-
-            // Inner soft white-pink highlight
-            ctx.shadowColor = '#ffffff';
-            ctx.shadowBlur = 8;
-            ctx.lineWidth = 4;
-            ctx.strokeStyle = '#ffe4ee';
-            ctx.beginPath();
-            ctx.arc(cx, cy, radius - 3, 0, Math.PI * 2);
-            ctx.stroke();
-            ctx.restore();
-
-            const tex = new THREE.CanvasTexture(canvas);
-            tex.generateMipmaps = true;
-            tex.minFilter = THREE.LinearMipmapLinearFilter;
-            tex.magFilter = THREE.LinearFilter;
             tex.needsUpdate = true;
-            onReady(tex);
         };
 
-        img.onload = () => renderCanvas(img);
+        const img = new Image();
+        img.onload = () => drawImg(img);
+
+        const sources = [
+            (typeof window !== 'undefined' && window.PROFILE_PHOTO_DATA) ? window.PROFILE_PHOTO_DATA : '',
+            'profile.png',
+            'profile.jpg',
+            'vip.jpg',
+            'vip.png'
+        ].filter(Boolean);
+
+        let srcIdx = 0;
         img.onerror = () => {
-            if (!img.src.includes('img/vip.png')) {
-                img.src = 'img/vip.png';
-            } else if (!img.src.includes('assets/vip.png')) {
-                img.src = 'assets/vip.png';
+            srcIdx++;
+            if (srcIdx < sources.length) {
+                img.src = sources[srcIdx];
             }
         };
-        img.src = 'vip.png';
+
+        img.src = sources[0];
+        if (img.complete && img.naturalWidth > 0) {
+            drawImg(img);
+        }
+
+        onReady(tex);
     }
 
     // =========================================================================
@@ -379,10 +373,10 @@
             this.group = new THREE.Group();
             this.scene.add(this.group);
 
-            this.group.rotation.x = 0.0; // Thẳng đứng, cân đối tuyệt đối trước sau
-            this.group.position.y = -0.85; // Hạ trái tim xuống thấp
+            this.group.rotation.set(0, 0, 0); // Thẳng đứng, cân đối tuyệt đối trước sau
+            this.group.position.y = -2.35; // Hạ trái tim xuống thấp sát 2/10 đáy
             this.photoBaseScale = 0.0;
-            this.photoTargetScale = 2.45;
+            this.isPhotoRevealed = false;
 
             this.initGeometry();
             this.initMaterial();
@@ -393,10 +387,13 @@
         updateScale() {
             const aspect = window.innerWidth / window.innerHeight;
             if (aspect < 1.0) {
-                const mobileScale = Math.min(0.78, Math.max(0.62, aspect * 1.45));
+                // Mobile
+                const mobileScale = Math.min(0.72, Math.max(0.58, aspect * 1.35));
                 this.group.scale.setScalar(mobileScale);
             } else {
-                this.group.scale.setScalar(1.0);
+                // Desktop / Laptop: Tăng to hơn một chút vừa vặn và đẹp mắt
+                const desktopScale = Math.min(0.90, Math.max(0.78, (window.innerHeight / 900) * 0.88));
+                this.group.scale.setScalar(desktopScale);
             }
         }
 
@@ -410,7 +407,6 @@
             const sizes = new Float32Array(this.particleCount);
             const phases = new Float32Array(this.particleCount);
             const sparkleSpeeds = new Float32Array(this.particleCount);
-            const isShellArr = new Float32Array(this.particleCount);
 
             const goldPalette = [
                 new THREE.Color('#FFD76A'),
@@ -456,7 +452,7 @@
                 // Shoot up from the Core Eye of the lower disk
                 const diskCoreAngle = Math.random() * Math.PI * 2;
                 const diskCoreRadius = 0.05 + Math.pow(Math.random(), 2.0) * 0.45;
-                const diskCoreY = -4.85 + (Math.random() - 0.5) * 0.15;
+                const diskCoreY = -6.45 + (Math.random() - 0.5) * 0.15;
 
                 startPositions[i3] = Math.cos(diskCoreAngle) * diskCoreRadius;
                 startPositions[i3 + 1] = diskCoreY;
@@ -607,12 +603,58 @@
         initPoints() {
             this.points = new THREE.Points(this.geometry, this.material);
             this.group.add(this.points);
+
+            this.photoBaseScale = 0.0;
+            this.isPhotoRevealed = false;
+
+            // Tạo 3D Photo Mesh hình tròn gắn liền trực tiếp vào Trái Tim
+            createCircularPinkPhotoTexture((tex) => {
+                const photoGeo = new THREE.PlaneGeometry(2.35, 2.35);
+                const photoMat = new THREE.MeshBasicMaterial({
+                    map: tex,
+                    transparent: true,
+                    opacity: 1.0,
+                    side: THREE.DoubleSide,
+                    depthWrite: false,
+                    color: new THREE.Color(1.12, 1.12, 1.12)
+                });
+                this.photoMesh = new THREE.Mesh(photoGeo, photoMat);
+                this.photoMesh.position.set(0, 0.95, 0.25); // Đặt chính xác giữa tâm trên của trái tim
+                this.photoMesh.renderOrder = 9999;
+                this.photoMesh.scale.set(0.0, 0.0, 0.0);
+                this.group.add(this.photoMesh);
+
+                if (this.uniforms.uColorMode.value > 0.5 || this.isPhotoRevealed) {
+                    this.photoBaseScale = 1.0;
+                }
+            });
+        }
+
+        revealPhoto(duration = 1.2) {
+            this.isPhotoRevealed = true;
+            this.photoBaseScale = 1.0;
+            if (this.photoMesh) {
+                this.photoMesh.visible = true;
+                const gsap = window.gsap;
+                if (gsap) {
+                    gsap.fromTo(this, { photoBaseScale: 0.0 }, {
+                        photoBaseScale: 1.0,
+                        duration: duration,
+                        ease: "back.out(1.5)"
+                    });
+                }
+            }
         }
 
         update(time) {
             this.uniforms.uTime.value = time;
             let pulseVal = 0;
             if (this.uniforms.uColorMode.value > 0.5) {
+                // Tự động mở ảnh khi trái tim đã chuyển sang màu đỏ/hồng
+                if (!this.isPhotoRevealed && this.photoBaseScale < 0.1) {
+                    this.revealPhoto(1.2);
+                }
+
                 const period = 1.02; // Nhịp tim chân thực, uy lực
                 const t = (time % period) / period;
 
@@ -635,20 +677,12 @@
                 this.uniforms.uPulse.value = pulseVal;
             }
 
-            this.group.rotation.y = Math.sin(time * 0.35) * 0.32;
-            this.group.rotation.x = 0.12 + Math.cos(time * 0.25) * 0.08;
-        }
+            // Giữ Trái Tim luôn thẳng đứng, cân đối tuyệt đối khi quay 360 độ
+            this.group.rotation.set(0, 0, 0);
 
-        revealPhoto(duration = 1.6) {
-            const gsap = window.gsap;
-            if (gsap) {
-                gsap.to(this, {
-                    photoBaseScale: this.photoTargetScale,
-                    duration: duration,
-                    ease: "back.out(1.5)"
-                });
-            } else {
-                this.photoBaseScale = this.photoTargetScale;
+            if (this.photoMesh) {
+                const finalScale = this.photoBaseScale * (1.0 + pulseVal * 0.45);
+                this.photoMesh.scale.set(finalScale, finalScale, finalScale);
             }
         }
 
@@ -665,7 +699,7 @@
             this.scene.add(this.group);
             this.globalAlpha = 0.0;
             this.colorMode = 0.0; // 0.0: Gold, 1.0: Deep Red Heart Colors
-            this.baseY = -4.85;   // Đĩa nằm ở 3/4 phía dưới màn hình
+            this.baseY = -6.45;   // Đĩa hạ xuống thấp cách đáy 2/10
             this.group.position.set(0, this.baseY, 0);
 
             this.initBlackHole();
@@ -948,10 +982,18 @@
             this.streamPoints = new THREE.Points(streamGeo, this.streamMaterial);
             this.group.add(this.streamPoints);
 
-            const isMobile = window.innerWidth < window.innerHeight;
-            const coreScale = isMobile ? 0.88 : 1.0;
-            this.group.scale.setScalar(coreScale);
+            this.updateScale();
             this.streamActive = false;
+        }
+
+        updateScale() {
+            const aspect = window.innerWidth / window.innerHeight;
+            if (aspect < 1.0) {
+                this.group.scale.setScalar(0.85);
+            } else {
+                const desktopScale = Math.min(0.92, Math.max(0.78, (window.innerHeight / 900) * 0.90));
+                this.group.scale.setScalar(desktopScale);
+            }
         }
 
         startStreamFlow() {
@@ -1361,7 +1403,7 @@
             this.prevPointer = { x: 0, y: 0 };
             // Góc xoay cầu: Cố định góc chính diện hoàn hảo 100% y hệt intro (phi = Math.PI * 0.5)
             this.spherical = {
-                radius: (window.innerWidth < window.innerHeight) ? 14.2 : 11.2,
+                radius: (window.innerWidth < window.innerHeight) ? 14.2 : 12.8,
                 theta: 0,           // Chính diện mặt trước (Z+)
                 phi: Math.PI * 0.50 // Góc nhìn ngang song song với tâm (y = targetCenter.y)
             };
@@ -1370,8 +1412,8 @@
                 theta: 0,
                 phi: Math.PI * 0.50
             };
-            // Tâm hệ thống cố định ở giữa Trái Tim và Đĩa (y = -2.65)
-            this.targetCenter = new THREE.Vector3(0, -2.65, 0);
+            // Tâm hệ thống cố định ở giữa Trái Tim và Đĩa (y = -3.85)
+            this.targetCenter = new THREE.Vector3(0, -3.85, 0);
             this.currentLookAt = this.targetCenter.clone();
 
             const onPointerDown = (clientX, clientY) => {
@@ -1424,7 +1466,7 @@
         }
 
         updateBaseZ() {
-            this.spherical.radius = (window.innerWidth < window.innerHeight) ? 14.2 : 11.2;
+            this.spherical.radius = (window.innerWidth < window.innerHeight) ? 14.2 : 12.8;
             this.targetSpherical.radius = this.spherical.radius;
         }
 
@@ -1471,9 +1513,9 @@
             }
 
             const isMobile = window.innerWidth < window.innerHeight;
-            // Giữ nguyên khoảng cách gần, to rõ, không bị lùi xa thu nhỏ lại
-            const startZ = isMobile ? 14.2 : 11.2;
-            const targetZ = isMobile ? 14.2 : 11.2;
+            // Giữ nguyên khoảng cách gần, to rõ, vừa vặn cả trên PC và điện thoại
+            const startZ = isMobile ? 14.2 : 12.8;
+            const targetZ = isMobile ? 14.2 : 12.8;
 
             this.heart.setAlpha(0.0);
             this.heart.setConvergence(0.0);
@@ -1484,7 +1526,7 @@
             this.floatingHearts.setAlpha(0.0);
             this.floatingTexts.setAlpha(0.0);
             this.sparkles.setAlpha(0.0);
-            this.camera.position.set(0, -2.65, startZ);
+            this.camera.position.set(0, -3.85, startZ);
 
             const tl = gsap.timeline({
                 onComplete: () => { this.isFinished = true; }
@@ -1505,7 +1547,7 @@
             // Phase 2: Hạt năng lượng bắn vút từ LÕI ĐĨA lên -> Tụ ở tâm -> Bùng nở hình thành Trái Tim
             tl.to(this.heart.uniforms.uGlobalAlpha, { value: 1.0, duration: 0.6, ease: "power1.inOut" }, 0.35);
             tl.to(this.heart.uniforms.uConvergence, { value: 1.0, duration: 4.5, ease: "none" }, 0.45);
-            tl.to(this.camera.position, { z: targetZ, y: -2.65, duration: 4.8, ease: "sine.inOut" }, 0.45);
+            tl.to(this.camera.position, { z: targetZ, y: -3.85, duration: 4.8, ease: "sine.inOut" }, 0.45);
 
             // KHI TRÁI TIM ĐÃ BẮN LÊN & HÌNH THÀNH XONG (tại giây 4.2), KÍCH HOẠT DÒNG HẠT BẮT ĐẦU TỪ TỪ NÂNG LÊN TỪ ĐĨA
             tl.add(() => {
@@ -1529,9 +1571,10 @@
                 tl.to(this.flashOverlay, { opacity: 1.0, duration: 0.28, ease: "power3.in" }, 5.45);
             }
 
-            // Chuyển sang Trái Tim Đỏ & Hố Đen Ruby ngay đỉnh điểm chớp pháo hoa
+            // Chuyển sang Trái Tim Đỏ & Hố Đen Ruby ngay đỉnh điểm chớp pháo hoa, bắt đầu đập và nở bung ảnh
             tl.add(() => {
                 this.heart.setColorMode(1.0);
+                this.heart.revealPhoto(1.2);
                 if (this.ground.setColorMode) this.ground.setColorMode(1.0);
                 document.body.classList.add('red-world');
             }, 5.75);
@@ -1553,6 +1596,7 @@
             this.heart.setAlpha(1.0);
             this.heart.setConvergence(1.0);
             this.heart.setColorMode(1.0);
+            this.heart.revealPhoto(0.1);
             this.ground.setAlpha(0.95);
             this.ground.setColorMode(1.0);
             this.floatingHearts.setAlpha(0.85);
@@ -1668,6 +1712,9 @@
 
                 if (this.heart && this.heart.updateScale) {
                     this.heart.updateScale();
+                }
+                if (this.ground && this.ground.updateScale) {
+                    this.ground.updateScale();
                 }
                 if (this.cameraAnim && this.cameraAnim.updateBaseZ) {
                     this.cameraAnim.updateBaseZ();
@@ -2432,7 +2479,7 @@
             const delta = Math.min(this.clock.getDelta(), 0.1);
             const elapsedTime = this.clock.getElapsedTime();
 
-            this.heart.update(elapsedTime);
+            this.heart.update(elapsedTime, this.camera);
             this.ground.update(elapsedTime);
             if (this.photosManager) this.photosManager.update();
             this.floatingHearts.update(elapsedTime, delta);
