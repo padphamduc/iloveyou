@@ -359,6 +359,89 @@
         onReady(tex);
     }
 
+    const memoryPhotoCache = new Map();
+    // Load and build clean circular texture with soft glowing border for 14 memory photos
+    function createCircularMemoryPhotoTexture(src, index = 0) {
+        const cacheKey = src || ('oanh_' + index);
+        if (memoryPhotoCache.has(cacheKey)) return memoryPhotoCache.get(cacheKey);
+
+        const size = 256;
+        const canvas = document.createElement('canvas');
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        const center = size / 2;
+        const radius = size * 0.44;
+
+        const tex = new THREE.CanvasTexture(canvas);
+        if (THREE.sRGBEncoding) tex.encoding = THREE.sRGBEncoding;
+
+        const draw = (img) => {
+            if (!img || !img.width) return;
+            ctx.clearRect(0, 0, size, size);
+
+            // 1. Soft glowing outer halo
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(center, center, radius + 3, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(255, 105, 180, 0.35)';
+            ctx.shadowColor = 'rgba(255, 50, 130, 0.9)';
+            ctx.shadowBlur = 12;
+            ctx.fill();
+            ctx.restore();
+
+            // 2. Circular clipped photo
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(center, center, radius, 0, Math.PI * 2);
+            ctx.closePath();
+            ctx.clip();
+
+            // Brightness & Contrast boost
+            ctx.filter = 'brightness(1.20) contrast(1.10) saturate(1.10)';
+
+            const minDim = Math.min(img.width, img.height);
+            const sx = (img.width - minDim) / 2;
+            const sy = (img.height - minDim) / 2;
+            ctx.drawImage(img, sx, sy, minDim, minDim, center - radius, center - radius, radius * 2, radius * 2);
+            ctx.restore();
+
+            // 3. Delicate rounded border
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(center, center, radius, 0, Math.PI * 2);
+            ctx.lineWidth = 4.0;
+            ctx.strokeStyle = 'rgba(255, 192, 203, 0.95)';
+            ctx.shadowColor = 'rgba(255, 105, 180, 0.6)';
+            ctx.shadowBlur = 6;
+            ctx.stroke();
+            ctx.restore();
+
+            tex.needsUpdate = true;
+        };
+
+        const img = new Image();
+        img.onload = () => draw(img);
+
+        const dataSrc = (typeof window !== 'undefined' && window.OANH_PHOTO_DATA && window.OANH_PHOTO_DATA[index]) 
+            ? window.OANH_PHOTO_DATA[index] 
+            : src;
+
+        img.onerror = () => {
+            if (img.src !== src && !img.src.includes('./oanh/')) {
+                img.src = './' + src;
+            }
+        };
+
+        img.src = dataSrc;
+        if (img.complete && img.naturalWidth > 0) {
+            draw(img);
+        }
+
+        memoryPhotoCache.set(cacheKey, tex);
+        return tex;
+    }
+
     // =========================================================================
     // 5. 3D OBJECTS
     // =========================================================================
@@ -1087,14 +1170,120 @@
         }
     }
 
-    // --- FloatingPhotosManager (Disabled) ---
+    // --- FloatingPhotosManager: 14 Circular Memory Photos floating gracefully up from bottom ---
     class FloatingPhotosManager {
-        constructor() {
+        constructor(scene) {
+            this.scene = scene;
+            this.group = new THREE.Group();
+            if (this.scene) {
+                this.scene.add(this.group);
+            }
             this.items = [];
-            this.globalAlpha = 0;
+            this.globalAlpha = 1.0;
+
+            this.photoSources = [
+                'oanh/2aoboquexdvcbvsz8cinmwxqicdler1hgp0vgr4y1.jpg',
+                'oanh/2aoboquexda3umhp15tyb2tgkghvxdk1joresasc2.jpg',
+                'oanh/2aoboquexdjfteyhkxclzcshb9rdqu4nn7xfziyg3.jpg',
+                'oanh/2aoboquexdria5zzwwnw2ie1watj8xskollfnt5s4.jpg',
+                'oanh/2aoboquexe89qmwpqx1yjx7tua4nr2wwabgrdjvm5.jpg',
+                'oanh/2aoboquexevif84up2igmottas3hulsxhhxks6oo6.jpg',
+                'oanh/2aoboquexedjfmvzcgdlhhabicdrnzddlwih9mio7.jpg',
+                'oanh/2aoboquexelon2u5jsh7aiyflphhelwxym8x2rji8.jpg',
+                'oanh/2aoboquexevecet47isxlcc2lxsnj55vmcuvqsxk9.jpg',
+                'oanh/2aoboquexf1fyytefloicti6tvlu9niylgknawo010.jpg',
+                'oanh/2aoboquexf9ifpuwquzsfzfbogei7vi9c3ainkmw11.jpg',
+                'oanh/2aoboquexfknuu23lojprfkrvpw0yp2u1fkbki0012.jpg',
+                'oanh/2aoboquexfwez2oxm6h6nszx4xsvpr3uywmzwbpq13.jpg',
+                'oanh/2aoboque8viaujtapxmdv6nm0ozgxurjk0tpqjrq14.jpg'
+            ];
+
+            this.initPhotos();
         }
-        update() {}
-        setAlpha(val) { this.globalAlpha = val; }
+
+        initPhotos() {
+            // Khởi tạo 35 đốm ảnh kỷ niệm tròn (~15px) bay lượn vừa vặn từ đáy
+            const totalCount = 35;
+            for (let i = 0; i < totalCount; i++) {
+                const photoIdx = i % this.photoSources.length;
+                const src = this.photoSources[photoIdx];
+                const tex = createCircularMemoryPhotoTexture(src, photoIdx);
+
+                const mat = new THREE.SpriteMaterial({
+                    map: tex,
+                    transparent: true,
+                    opacity: 0.95,
+                    depthWrite: false,
+                    fog: false,
+                    color: new THREE.Color(1.15, 1.15, 1.15)
+                });
+
+                const sprite = new THREE.Sprite(mat);
+
+                // Tất cả xuất phát từ dưới đáy màn hình (y < -11.0) và bay trôi lên
+                const isNarrow = window.innerWidth < window.innerHeight;
+                const xSpan = isNarrow ? 4.8 : 8.5;
+                const z = randomRange(-4.8, 2.5);
+                const x = randomRange(-xSpan, xSpan);
+                const y = -11.0 - (i * 0.38 + Math.random() * 0.3); // Xếp hàng dưới đáy
+                sprite.position.set(x, y, z);
+
+                // Kích thước tròn nhỏ xinh ~15px
+                const baseScale = randomRange(0.36, 0.48);
+                sprite.scale.set(baseScale, baseScale, 1.0);
+
+                this.items.push({
+                    sprite,
+                    material: mat,
+                    baseScale,
+                    speedY: randomRange(0.55, 1.15),
+                    swayFreq: randomRange(0.4, 1.3),
+                    swayAmp: randomRange(0.25, 0.75),
+                    phase: Math.random() * Math.PI * 2,
+                    initialZ: z,
+                    targetOpacity: 0.95
+                });
+
+                this.group.add(sprite);
+            }
+        }
+
+        update(time, delta = 0.016) {
+            const isNarrow = window.innerWidth < window.innerHeight;
+            const xSpan = isNarrow ? 4.5 : 8.0;
+
+            for (let i = 0; i < this.items.length; i++) {
+                const item = this.items[i];
+                const pos = item.sprite.position;
+
+                // Bay lên từ từ từ dưới đáy lên trời
+                pos.y += item.speedY * delta;
+                pos.x += Math.sin(time * item.swayFreq + item.phase) * item.swayAmp * delta;
+                pos.z = item.initialZ + Math.cos(time * 0.5 + item.phase) * 0.3;
+
+                // Khi bay lên đỉnh màn hình (y > 4.2), reset lại vị trí dưới đáy
+                if (pos.y > 4.2) {
+                    pos.y = randomRange(-12.5, -11.0);
+                    pos.x = randomRange(-xSpan, xSpan);
+                    item.initialZ = randomRange(-4.5, 2.5);
+                    pos.z = item.initialZ;
+                }
+
+                // Độ mờ dần khi trồi lên từ mép đáy hoặc biến mất ở mép đỉnh
+                let fade = 1.0;
+                if (pos.y < -9.2) {
+                    fade = Math.max(0.0, (pos.y - (-11.0)) / 1.8);
+                } else if (pos.y > 3.0) {
+                    fade = Math.max(0.0, (4.2 - pos.y) / 1.2);
+                }
+
+                item.material.opacity = this.globalAlpha * item.targetOpacity * fade;
+            }
+        }
+
+        setAlpha(val) {
+            this.globalAlpha = val;
+        }
     }
 
     // --- FloatingHearts ---
@@ -1522,7 +1711,7 @@
             this.heart.setColorMode(0.0);
             this.ground.setAlpha(0.0);
             this.ground.setColorMode(0.0);
-            if (this.photosManager) this.photosManager.setAlpha(0.0);
+            if (this.photosManager) this.photosManager.setAlpha(1.0);
             this.floatingHearts.setAlpha(0.0);
             this.floatingTexts.setAlpha(0.0);
             this.sparkles.setAlpha(0.0);
@@ -1587,7 +1776,8 @@
                 tl.to(this.bloomPass, { strength: 0.95, radius: 0.48, duration: 0.85, ease: "power2.out" }, 5.8);
             }
 
-            // Phase 4: Thế Giới Đỏ vô tận cùng trái tim bay lượn
+            // Phase 4: Thế Giới Đỏ vô tận cùng 14 bức ảnh kỷ niệm & trái tim bay lượn
+            if (this.photosManager) tl.to(this.photosManager, { globalAlpha: 0.95, duration: 1.8, ease: "power2.out" }, 6.0);
             tl.to(this.floatingHearts, { globalAlpha: 0.85, duration: 1.6, ease: "power2.out" }, 6.2);
             tl.to(this.floatingTexts, { globalAlpha: 0.95, duration: 1.8, ease: "power2.out" }, 6.3);
         }
@@ -1599,6 +1789,7 @@
             this.heart.revealPhoto(0.1);
             this.ground.setAlpha(0.95);
             this.ground.setColorMode(1.0);
+            if (this.photosManager) this.photosManager.setAlpha(0.95);
             this.floatingHearts.setAlpha(0.85);
             this.floatingTexts.setAlpha(0.95);
             this.sparkles.setAlpha(0.8);
@@ -1732,7 +1923,7 @@
         initSceneObjects() {
             this.heart = new ParticleHeart(this.scene);
             this.ground = new ParticleGround(this.scene);
-            this.photosManager = new FloatingPhotosManager();
+            this.photosManager = new FloatingPhotosManager(this.scene);
             this.floatingHearts = new FloatingHearts(this.scene);
             this.floatingTexts = new FloatingTexts(this.scene, this.config);
             this.sparkles = new Sparkles(this.scene);
@@ -2481,7 +2672,7 @@
 
             this.heart.update(elapsedTime, this.camera);
             this.ground.update(elapsedTime);
-            if (this.photosManager) this.photosManager.update();
+            if (this.photosManager) this.photosManager.update(elapsedTime, delta);
             this.floatingHearts.update(elapsedTime, delta);
             this.floatingTexts.update(elapsedTime, delta);
             this.sparkles.update(elapsedTime);
